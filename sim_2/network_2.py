@@ -49,8 +49,9 @@ class NetworkPacket:
     ##@param dst: address of the destination host
     # @param data_S: packet payload
     # @param prot_S: upper layer protocol for the packet (data, or control)
-    def __init__(self, dst, prot_S, data_S):
+    def __init__(self, dst, src, prot_S, data_S):
         self.dst = dst
+        self.src = src
         self.data_S = data_S
         self.prot_S = prot_S
         
@@ -61,6 +62,7 @@ class NetworkPacket:
     ## convert packet to a byte string for transmission over links
     def to_byte_S(self):
         byte_S = str(self.dst).zfill(self.dst_S_length)
+        byte_S += str(self.src).zfill(self.dst_S_length)
         if self.prot_S == 'data':
             byte_S += '1'
         elif self.prot_S == 'control':
@@ -75,17 +77,24 @@ class NetworkPacket:
     @classmethod
     def from_byte_S(self, byte_S):
         dst = byte_S[0 : NetworkPacket.dst_S_length].strip('0')
-        prot_S = byte_S[NetworkPacket.dst_S_length : NetworkPacket.dst_S_length + NetworkPacket.prot_S_length]
+        src = byte_S[NetworkPacket.dst_S_length : int(NetworkPacket.dst_S_length*2)].strip('0')
+        prot_S = byte_S[int(NetworkPacket.dst_S_length*2) : (int(NetworkPacket.dst_S_length*2)) + NetworkPacket.prot_S_length]
         if prot_S == '1':
             prot_S = 'data'
         elif prot_S == '2':
             prot_S = 'control'
         else:
             raise('%s: unknown prot_S field: %s' %(self, prot_S))
-        data_S = byte_S[NetworkPacket.dst_S_length + NetworkPacket.prot_S_length : ]        
-        return self(dst, prot_S, data_S)
-    
+        data_S = byte_S[NetworkPacket.dst_S_length*2 + NetworkPacket.prot_S_length : ]        
+        return self(dst, src, prot_S, data_S)
 
+    @staticmethod
+    def isACK(pkt_S):
+        s = pkt_S
+        if("ACK:" in s):
+            return True
+        return False
+            
     
 
 ## Implements a network host for receiving and transmitting data
@@ -105,7 +114,7 @@ class Host:
     # @param dst: destination address for the packet
     # @param data_S: data being transmitted to the network layer
     def udt_send(self, dst, data_S):
-        p = NetworkPacket(dst, 'data', data_S)
+        p = NetworkPacket(dst, self.addr, 'data', data_S)
         print('%s: sending packet "%s"' % (self, p))
         self.intf_L[0].put(p.to_byte_S(), 'out') #send packets always enqueued successfully
         
@@ -114,6 +123,11 @@ class Host:
         pkt_S = self.intf_L[0].get('in')
         if pkt_S is not None:
             print('%s: received packet "%s"' % (self, pkt_S))
+            if(NetworkPacket.isACK(pkt_S) == False):
+                pkt = NetworkPacket.from_byte_S(pkt_S)
+                ack_S = "ACK:" + str(pkt.src)
+                self.udt_send(pkt.src, ack_S)
+                
        
     ## thread target for the host to keep receiving data
     def run(self):
@@ -195,6 +209,7 @@ class Router:
             retS += "\n"
         
         print(retS)
+        return retS
 
     ## called when printing the object
     def __str__(self):
@@ -227,9 +242,11 @@ class Router:
             # TODO: Here you will need to implement a lookup into the 
             # forwarding table to find the appropriate outgoing interface
             # for now we assume the outgoing interface is 1
-            self.intf_L[1].put(p.to_byte_S(), 'out', True)
+            dest = p.dst
+            intF = self.table.getBestRoute(dest)
+            self.intf_L[intF].put(p.to_byte_S(), 'out', True)
             print('%s: forwarding packet "%s" from interface %d to %d' % \
-                (self, p, i, 1))
+                (self, p, i, intF))
         except queue.Full:
             print('%s: packet "%s" lost on interface %d' % (self, p, i))
             pass
@@ -240,7 +257,7 @@ class Router:
     def send_routes(self, i):
         # TODO: Send out a routing table update
         #create a routing table update packet
-        p = NetworkPacket(0, 'control', str(self.table))
+        p = NetworkPacket(0, '-1', 'control', str(self.table))
         try:
             print('%s: sending routing update "%s" from interface %d' % (self, p, i))
             self.intf_L[i].put(p.to_byte_S(), 'out', True)
@@ -316,7 +333,9 @@ class RoutingTable:
             return (self.getCostOf(router, self.name) + self.getCostOf(dest, self.name))
 
     def getBestRoute(self, dest):
-        return -1 #interface
+        dv = self.DVother(dest, self.name)
+        intF = self.intF_Of(dv[0])
+        return intF #interface
 
     def getRouters(self):
         return self.routers
@@ -353,22 +372,22 @@ class RoutingTable:
                 self.dests.append(key)
                 changed = True
             else:
-                print("\nDV: ")
+                #print("\nDV: ")
                 dv = self.DV(key)
                 path = dv[0]
                 cost = dv[1]
-                print("In table for router:" +  str(self.name))
-                print(path, end='')
-                print("-->", end='')
-                print(key)
-                print("This route costs: " + str(cost))
-                print()
+                #print("In table for router:" +  str(self.name))
+                #print(path, end='')
+                #print("-->", end='')
+                #print(key)
+                #print("This route costs: " + str(cost))
+                #print()
                 if(path == self.name):
-                    print("Nothing changed")
+                    print("\nInUpdate:Nothing changed")
                     continue
                 else:
                     changed = True
-                    print("what do?")
+                    print("InUpdate:whatDo?NothingChangedButItShouldHave")
                     this = thisDict[key]
         return changed
 
@@ -412,6 +431,9 @@ class RoutingTable:
 
     def DVother(self, dest, router):
         thisDict = self.costDicts[router]
+        #print("DV: ", end='')
+        #print("For:" + str(router) + "-->" + str(dest) + "\nDict: ")
+        #print(thisDict)
         if(isinstance(thisDict, int)):
             return [-1, -1]
         via = None
@@ -433,7 +455,8 @@ class RoutingTable:
             elif((c + dv) < cost):
                 cost = c + dv
                 via = path
-                
+            #print("Out via current path: " + str(path) + ", cost: " + str(c+dv))
+        #print("DV results: out to: " + str(via) + ", with cost of: " + str(cost))
         return [via, cost] if ((via != None) and (cost != None)) else [-1, -1] #path and cost taken to dest
         
 

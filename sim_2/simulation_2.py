@@ -1,12 +1,13 @@
-import network
-import link
+import network_2 as network
+import link_2 as link
 import threading
 from time import sleep
 from rprint import print
 
 ##configuration parameters
 router_queue_size = 0 #0 means unlimited
-simulation_time = 1   #give the network sufficient time to execute transfers
+routing_time = 1.5
+simulation_time = 3   #give the network sufficient time to execute transfers
 
 if __name__ == '__main__':
     object_L = [] #keeps track of objects, so we can kill their threads at the end
@@ -50,11 +51,17 @@ if __name__ == '__main__':
     
     ## compute routing tables
     router_a.send_routes(1) #one update starts the routing process
-    sleep(simulation_time)  #let the tables converge
+    sleep(routing_time)  #let the tables converge
     print("Converged routing tables")
     for obj in object_L:
         if str(type(obj)) == "<class 'network.Router'>":
             obj.print_routes()
+
+    print()
+    router_a.table.DVother('H1', 'RB')
+    print()
+    router_a.table.DVother('H2', 'RA')
+    print()
 
     #send packet from host 1 to host 2
     host_1.udt_send('H2', 'MESSAGE_FROM_H1')
