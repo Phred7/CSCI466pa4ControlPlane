@@ -152,6 +152,29 @@ class Router:
         #TODO: print the routes as a two dimensional table
         self.print_routes2()
 
+##    def print_routes2(self):
+##        retS = '\n'
+##        retS += self.name
+##        retS += ":\n      "
+##        for item in self.table.getDests():
+##            retS += str(item) + "    "
+##        retS += "\n"
+##        for r in self.table.getRouters():
+##            retS += str(r)
+##            for d in self.table.getDests():
+##                c = self.table.DVother(d, r)[1]
+##                #c = self.table.getCostOf(d, r)
+##                if((c < 0) or (c > 9)):
+##                    retS += "    "
+##                else:
+##                    retS += "     "
+##                retS += str(c)
+##                
+##            retS += "\n"
+##        
+##        print(retS)
+
+
     def print_routes2(self):
         retS = '\n'
         retS += self.name
@@ -172,7 +195,6 @@ class Router:
             retS += "\n"
         
         print(retS)
-
 
     ## called when printing the object
     def __str__(self):
@@ -339,26 +361,28 @@ class RoutingTable:
                 self.dests.append(key)
                 changed = True
             else:
-                #print("here")
-                #print(key)
+                print("\nDV: ")
                 dv = self.DV(key)
                 path = dv[0]
                 cost = dv[1]
-                #print(path)
-                #print(cost)
-                #print()
+                print("In table for router:" +  str(self.name))
+                print(path, end='')
+                print("-->", end='')
+                print(key)
+                print("This route costs: " + str(cost))
+                print()
+                if(path == self.name):
+                    continue
+                else:
+                    this = thisDict[key]
+                
                 #thisDict[
         #print(self.costDicts)   
-        print(str(self.name) + " Table Updated")
+        #print(str(self.name) + " Table Updated")
         return changed
 
     def intF_Of(self, node):
         this = self.costDicts[self.name]
-        #print("in ", end='')
-        #print(self.name, end='')
-        #print(" looking for: ", end='')
-        #print(node)
-        #print(this)
         if(node in this.keys()):
             i = 0
             key = None
@@ -396,14 +420,36 @@ class RoutingTable:
                 via = path
                 
         return [via, cost] if ((via != None) and (cost != None)) else [-1, -1] #path and cost taken to dest
-                
 
-##    def DvNxt(self, name, dest):
-##        thisDict = self.costDicts[name]
-##        for path in self.reachable:
-##            c = self.cost(self.name, path)
-##            dv = 
-##            cost =  +
+
+    def DVother(self, dest, router):
+        thisDict = self.costDicts[router]
+        print("r: " + str(router) + ", dest: " + str(dest) + ", ", end='')
+        print(thisDict)
+        if(isinstance(thisDict, int)):
+            return [-1, -1]
+        via = None
+        cost = None
+        for path in thisDict.keys():
+            if(via == None):
+                via = path
+                
+            if(path == dest):
+                c = 0
+                dv = self.getCostOf(dest, router)
+            else:
+                c = self.getCostOf(path, router)
+                dv = self.getCostOf(dest, path)
+
+            if(cost == None):
+                cost = c + dv
+                via = path
+            elif((c + dv) < cost):
+                cost = c + dv
+                via = path
+                
+        return [via, cost] if ((via != None) and (cost != None)) else [-1, -1] #path and cost taken to dest
+        
 
     def __str__(self):
         return self.toStr()
@@ -455,71 +501,4 @@ class RoutingTable:
             cost = e[2]
             dictionary[dest] = {int(intF):int(cost)}
         #print(dictionary)
-        return dictionary #return other.costDicts[other.name] 
-        
-        
-
-##class RoutingTable:
-##    name = ''
-##    dests = [] #network destinations (top)
-##    costs = None #list of costs corresponting to this destination
-##    known = [] #paths through known routers (column)
-##    costD = None
-##    
-##    def __init__(self, cost_D, name):
-##        self.name = ''
-##        self.dests = []
-##        self.costs = []
-##        self.known = []
-##        self.costD = None
-##        self.costD = cost_D
-##        self.name = name
-##        self.known.append(self.name)
-##        self.dests.append(self.name)
-##        for key in self.costD:
-##            self.dests.append(key)
-##            if(isinstance(key, str)):
-##                if(key[0] == 'R'):
-##                    self.known.append(key)
-##        self.costs = [[{0: -1} for g in range(len(self.dests))] for h in range(len(self.known))]
-##        for i in range(len(self.known)):
-##            for j in range(len(self.dest)):
-##                d = self.dests[j]
-##                r = self.known[i]
-##                
-##                
-##
-##        print("name: " + self.name)
-##        print(self.costD)
-##        print(self.dests)
-##        print(self.costs)
-##        print(self.known)
-##
-##    def getKnown(self):
-##        return self.known
-##
-##    def getCosts(self):
-##        return self.costs
-##
-##    def getDests(self):
-##        return self.dests
-##
-##    def getCostOf(self, dest, router):
-##        d = self.dests.index(dest)
-##        r = self.known.index(router)
-##        costs = self.costs[r][d]
-##        minVal = None
-##        for key in costs:
-##            this = costs[key]
-##            if(minVal == None):
-##                minVal = this
-##            if((this < minVal) and (this > -1)):
-##                minVal = this
-##        return minVal
-
-
-
-
-
-
-        
+        return dictionary #return other.costDicts[other.name]       

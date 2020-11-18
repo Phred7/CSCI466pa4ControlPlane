@@ -141,17 +141,60 @@ class Router:
         self.intf_L = [Interface(max_queue_size) for _ in range(len(cost_D))]
         #save neighbors and interfeces on which we connect to them
         self.cost_D = cost_D    # {neighbor: {interface: cost}}
-        #TODO: set up the routing table for connected hosts
+        self.table = RoutingTable(cost_D, name)
         self.rt_tbl_D = {}      # {destination: {router: cost}}
         print('%s: Initialized routing table' % self)
-        self.print_routes()
+        self.print_routes2()
     
         
     ## Print routing table
     def print_routes(self):
         #TODO: print the routes as a two dimensional table
-        print(self.rt_tbl_D)
+        self.print_routes2()
 
+##    def print_routes2(self):
+##        retS = '\n'
+##        retS += self.name
+##        retS += ":\n      "
+##        for item in self.table.getDests():
+##            retS += str(item) + "    "
+##        retS += "\n"
+##        for r in self.table.getRouters():
+##            retS += str(r)
+##            for d in self.table.getDests():
+##                c = self.table.DVother(d, r)[1]
+##                #c = self.table.getCostOf(d, r)
+##                if((c < 0) or (c > 9)):
+##                    retS += "    "
+##                else:
+##                    retS += "     "
+##                retS += str(c)
+##                
+##            retS += "\n"
+##        
+##        print(retS)
+
+
+    def print_routes2(self):
+        retS = '\n'
+        retS += self.name
+        retS += ":\n      "
+        for item in self.table.getDests():
+            retS += str(item) + "    "
+        retS += "\n"
+        for r in self.table.getRouters():
+            retS += str(r)
+            for d in self.table.getDests():
+                c = self.table.getCostOf(d, r)
+                if((c < 0) or (c > 9)):
+                    retS += "    "
+                else:
+                    retS += "     "
+                retS += str(c)
+                
+            retS += "\n"
+        
+        print(retS)
 
     ## called when printing the object
     def __str__(self):
@@ -197,7 +240,7 @@ class Router:
     def send_routes(self, i):
         # TODO: Send out a routing table update
         #create a routing table update packet
-        p = NetworkPacket(0, 'control', 'DUMMY_ROUTING_TABLE')
+        p = NetworkPacket(0, 'control', str(self.table))
         try:
             print('%s: sending routing update "%s" from interface %d' % (self, p, i))
             self.intf_L[i].put(p.to_byte_S(), 'out', True)
@@ -211,7 +254,11 @@ class Router:
     def update_routes(self, p, i):
         #TODO: add logic to update the routing tables and
         # possibly send out routing updates
+        boolean = self.table.updateTable(i, p.data_S)
         print('%s: Received routing update %s from interface %d' % (self, p, i))
+        print(self.print_routes2())
+        if(boolean == True):
+            self.send_routes(i)
 
                 
     ## thread target for the host to keep forwarding data
@@ -221,4 +268,218 @@ class Router:
             self.process_queues()
             if self.stop:
                 print (threading.currentThread().getName() + ': Ending')
-                return 
+                return
+
+
+class RoutingTable:
+    
+    def __init__(self, cost_D, name):
+        self.name = name
+        self.costD = cost_D
+        self.costDicts = {self.name: self.costD}
+        self.reachable = []
+        self.routers = []
+        self.dests = []
+        self.routers.append(self.name)
+        self.dests.append(self.name)
+        self.reachable.append(self.name)
+        for key in cost_D:
+            self.dests.append(key)
+            self.reachable.append(key)
+            if(key[0] == 'R'):
+                self.routers.append(key)
+                self.costDicts[key] = -1
+
+    def bestPath(self, dest):
+        return -1 #out interface 
+
+    def getCostOf(self, dest, router):
+        if(dest == router):
+            return 0
+        if(router in self.costDicts.keys()):
+            costs = self.costDicts[router]
+            minVal = None
+            if(isinstance(costs, dict)):
+                for key in costs:
+                    if(key == dest):
+                        intFaces = costs[key]
+                        for intF in intFaces:
+                            if(minVal == None):
+                                minVal = intFaces[intF]
+                            else:
+                                minVal = intFaces[intF] if intFaces[intF] < minVal else minVal           
+                return -1 if minVal == None else minVal #cost
+            else: #do not yet know connections for this router
+                return -1
+
+        else:
+            return (self.getCostOf(router, self.name) + self.getCostOf(dest, self.name))
+
+    def getBestRoute(self, dest):
+        return -1 #interface
+
+    def getRouters(self):
+        return self.routers
+
+    def getDests(self):
+        return self.dests
+
+    def getCosts(self):
+        return []
+
+    def updateTable(self, intF_in, dataIn):
+        changed = False
+        thisDict = self.costDicts[self.name]
+        r = None
+        rIn = None
+        for key in thisDict:
+            if(r != None):
+                break
+            elif(key in thisDict.keys()):
+                paths = thisDict[key]
+                for intF in paths:
+                    if(int(intF) == int(intF_in)):
+                        r = key
+
+        self.costDicts[r] = RoutingTable.fromStr(dataIn)
+
+        rTable = self.costDicts[r]
+        for key in rTable:
+            if(key not in thisDict.keys()):
+                if(key == self.name):
+                    continue
+                thisDict[key] = {intF_in: (int(self.getCostOf(r, self.name)) + int(self.getCostOf(key, r)))}
+                self.costDicts[self.name] = thisDict
+                self.dests.append(key)
+                changed = True
+            else:
+                print("\nDV: ")
+                dv = self.DV(key)
+                path = dv[0]
+                cost = dv[1]
+                print("In table for router:" +  str(self.name))
+                print(path, end='')
+                print("-->", end='')
+                print(key)
+                print("This route costs: " + str(cost))
+                print()
+                if(path == self.name):
+                    print("Nothing changed")
+                    continue
+                else:
+                    changed = True
+                    print("what do?")
+                    this = thisDict[key]
+        return changed
+
+    def intF_Of(self, node):
+        this = self.costDicts[self.name]
+        if(node in this.keys()):
+            i = 0
+            key = None
+            while(key == None):
+                if(i in this[node].keys()):
+                    key = i
+                    return i
+                i += 1
+        else:
+            return -1
+
+    def DV(self, dest):
+        thisDict = self.costDicts[self.name]
+        via = None
+        cost = None
+        for path in self.reachable:
+            if(via == None):
+                via = path
+                
+            if(path == dest):
+                c = 0
+                dv = self.getCostOf(dest, self.name)
+            else:
+                c = self.getCostOf(path, self.name)
+                dv = self.getCostOf(dest, path)
+
+            if(cost == None):
+                cost = c + dv
+                via = path
+            elif((c + dv) < cost):
+                cost = c + dv
+                via = path
+                
+        return [via, cost] if ((via != None) and (cost != None)) else [-1, -1] #path and cost taken to dest
+
+
+    def DVother(self, dest, router):
+        thisDict = self.costDicts[router]
+        if(isinstance(thisDict, int)):
+            return [-1, -1]
+        via = None
+        cost = None
+        for path in thisDict.keys():
+            if(via == None):
+                via = path
+                
+            if(path == dest):
+                c = 0
+                dv = self.getCostOf(dest, router)
+            else:
+                c = self.getCostOf(path, router)
+                dv = self.getCostOf(dest, path)
+
+            if(cost == None):
+                cost = c + dv
+                via = path
+            elif((c + dv) < cost):
+                cost = c + dv
+                via = path
+                
+        return [via, cost] if ((via != None) and (cost != None)) else [-1, -1] #path and cost taken to dest
+        
+
+    def __str__(self):
+        return self.toStr()
+    
+    def toStr(self):
+        retS = ''
+        retS += str(self.name)
+        retS += ';'
+        this = self.costDicts[self.name]
+        if(isinstance(this, int)):
+            retS += "DNE"
+            return retS
+        for connection in this:
+            if(isinstance(connection, int)):
+                retS += "DNE"
+                continue
+            retS += str(connection) + ':'
+            intF = this[connection]
+            if(isinstance(intF, int)):
+                retS += "DNE"
+                continue
+            for key in intF:
+                retS += str(key) + ':' + str(intF[key]) + ';'
+        return retS
+
+    @classmethod
+    def fromStr(self, s):
+        dictionary = {}
+        data = s
+        name = ''
+        i = 0
+        char = data[0]
+        while char != ';':
+            name += char
+            i += 1
+            char = data[i]
+        data = data[i+1:]
+        data = data.split(';')
+        for entry in data:
+            if(len(entry) < 2):
+                continue
+            e = entry.split(':')
+            dest = e[0]
+            intF = e[1]
+            cost = e[2]
+            dictionary[dest] = {int(intF):int(cost)}
+        return dictionary #return other.costDicts[other.name]   
