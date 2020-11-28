@@ -335,6 +335,7 @@ class RoutingTable:
     def getBestRoute(self, dest):
         dv = self.DVother(dest, self.name)
         intF = self.intF_Of(dv[0])
+        print("DV Best Path: Fwd pkt's from " + str(self.name) + " to " + str(dest) + " along interface " + str(intF))
         return intF #interface
 
     def getRouters(self):

@@ -57,11 +57,11 @@ if __name__ == '__main__':
         if str(type(obj)) == "<class 'network.Router'>":
             obj.print_routes()
 
-    print()
-    router_a.table.DVother('H1', 'RB')
-    print()
-    router_a.table.DVother('H2', 'RA')
-    print()
+##    print()
+##    router_a.table.DVother('H1', 'RB')
+##    print()
+##    router_a.table.DVother('H2', 'RA')
+##    print()
 
     #send packet from host 1 to host 2
     host_1.udt_send('H2', 'MESSAGE_FROM_H1')

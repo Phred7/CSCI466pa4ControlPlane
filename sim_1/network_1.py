@@ -152,29 +152,6 @@ class Router:
         #TODO: print the routes as a two dimensional table
         self.print_routes2()
 
-##    def print_routes2(self):
-##        retS = '\n'
-##        retS += self.name
-##        retS += ":\n      "
-##        for item in self.table.getDests():
-##            retS += str(item) + "    "
-##        retS += "\n"
-##        for r in self.table.getRouters():
-##            retS += str(r)
-##            for d in self.table.getDests():
-##                c = self.table.DVother(d, r)[1]
-##                #c = self.table.getCostOf(d, r)
-##                if((c < 0) or (c > 9)):
-##                    retS += "    "
-##                else:
-##                    retS += "     "
-##                retS += str(c)
-##                
-##            retS += "\n"
-##        
-##        print(retS)
-
-
     def print_routes2(self):
         retS = '\n'
         retS += self.name

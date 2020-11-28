@@ -34,8 +34,8 @@ class Link:
             #otherwise transmit the packet
             try:
                 intf_b.put(pkt_S, 'in')
-                print('%s: direction %s-%s -> %s-%s: transmitting packet "%s"' % \
-                    (self, node_a, node_a_intf, node_b, node_b_intf, pkt_S))
+#                print('%s: direction %s-%s -> %s-%s: transmitting packet "%s"' % \
+#                    (self, node_a, node_a_intf, node_b, node_b_intf, pkt_S))
             except queue.Full:
                 print('%s: direction %s-%s -> %s-%s: packet lost' % \
                     (self, node_a, node_a_intf, node_b, node_b_intf))
